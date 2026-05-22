@@ -13,15 +13,17 @@
 4. [快速開始（使用內建 Demo 資料）](#快速開始使用內建-demo-資料)
 5. [使用自訂資料集](#使用自訂資料集)
 6. [訓練設定說明](#訓練設定說明)
+7. [匯出 ONNX](#匯出-onnx)
 
 ---
 
 ## 環境需求
 
 ```
-依照README_ENV.md 安裝conda 環境
+依照README_ENV.md 建立conda 環境
 ```
 
+本機CUDA 版本：13.0 使用RTX3090訓練
 
 ---
 
@@ -48,7 +50,10 @@ MTK_TSM_multilabel/
 ├── archs/
 │   └── mobilenet_v2.py          ← MobileNetV2 架構
 ├── main.py                      ← 訓練主程式 ← store_name 在這裡設定
-└── run.sh                       ← 訓練啟動腳本 ← batch size / epochs 在這裡設定
+├── run.sh                       ← 訓練啟動腳本 ← batch size / epochs 在這裡設定
+├── export_onnx.py               ← 匯出 ONNX 腳本（.pth → _raw.onnx）
+├── remove_sub.py                ← 修正 ONNX Sub 節點（單獨使用時修改內部路徑）
+└── run_export.sh                ← 一鍵匯出＋修正腳本（推薦使用）
 ```
 
 ---
@@ -60,10 +65,17 @@ MTK_TSM_multilabel/
 | 項目 | Shape | 說明 |
 |---|---|---|
 | **Input** | `[B, 8, 256, 256]` | B = batch size，8 segments，單通道灰階，256×256 |
-| **Output** | `[B, 15]` | 15 個類別的原始分數（sigmoid 前），multi-label |
+| **Output** | `[B, 8, 15]` | 8 segments × 15 類別的原始分數（sigmoid 前），後處理對 8 維度取平均得到最終 15 類別機率 |
 
 > 模型內部會將 `[B, 8, 256, 256]` reshape 為 `[B×8, 1, 256, 256]` 送入 2D conv，  
 > 再透過 TSM 的 temporal shift 在 segments 之間傳遞時序資訊，最後 avg pooling 合併成一個預測。
+
+### ONNX 模型
+
+| 項目 | Shape |
+|---|---|
+| **Input** (`input`) | `[1, 8, 256, 256]` |
+| **Output** (`output`) | `[1, 8, 15]` |
 
 ---
 
@@ -156,6 +168,7 @@ CUDA_VISIBLE_DEVICES=0 python3 main.py ucf101 GRAY \
 |---|---|
 | `CUDA_VISIBLE_DEVICES` | 使用的 GPU 編號 |
 | `--epochs` | 訓練總 epoch 數 |
+| `--batch-size` | 需小於 train 資料筆數（因 `drop_last=True`） |
 | `--eval-freq` | 每幾個 epoch 做一次 validation |
 
 ### `main.py` — checkpoint / log 命名
@@ -168,10 +181,45 @@ args.store_name = 'yen_test'   # ← 改成你想要的實驗名稱
 - 權重儲存至：`checkpoint/{store_name}_cos/ckpt.pth.tar`
 - Log 儲存至：`log/{store_name}_cos/log.csv`
 
+### `export_onnx.py` — 類別數
+
+```python
+# export_onnx.py 第 31 行
+num_class = 15   # ← 若類別數不同請修改
+```
+
+---
+
+## 匯出 ONNX
+
+### 快速使用（推薦）
+
+使用 `run_export.sh` 一鍵完成匯出與 Sub 節點修正：
+
+```bash
+bash run_export.sh \
+    --checkpoint checkpoint/yen_test_cos/ckpt.pth.tar \
+    --output     checkpoint/yen_test_cos/tsm_1channel.onnx
+```
+
+#
+```
+
+### 輸出規格
+
+| 項目 | 值 |
+|---|---|
+| Input name | `input` |
+| Input shape | `[1, 8, 256, 256]`（batch=1，8 幀灰階）|
+| Output name | `output` |
+| Output shape | `[1, 8, 15]`（per-segment logits）|
+| Sub 節點 | 已替換為 Neg + Add（`run_export.sh` 自動處理）|
+
 ---
 
 ## 類別說明
 
 `annotation/classInd.txt` 定義 15 個類別（index 0–14），對應 output 向量的各個位元，  
-各類別實際語意請參照資料標注定義。
+
+---
 

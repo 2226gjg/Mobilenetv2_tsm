@@ -50,9 +50,10 @@ class TSN(nn.Module):
                  dropout=0.8, img_feature_dim=256,
                  crop_num=1, partial_bn=True, print_spec=True, pretrain='imagenet',
                  is_shift=False, shift_div=8, shift_place='blockres', fc_lr5=False,
-                 temporal_pool=False, non_local=False):
+                 temporal_pool=False, non_local=False, input_size=256):
         super(TSN, self).__init__()
         self.modality = modality
+        self._input_size = input_size
         self.num_segments = num_segments
         self.reshape = True
         self.before_softmax = before_softmax
@@ -164,8 +165,8 @@ class TSN(nn.Module):
                 make_non_local(self.base_model, self.num_segments)
 
             self.base_model.last_layer_name = 'fc'
-            
-            self.input_size = 256
+
+            self.input_size = self._input_size
             # motion
             # self.input_mean = [0.501, 0.502, 0.502]
             # self.input_std = [0.229, 0.013, 0.031]
@@ -206,7 +207,9 @@ class TSN(nn.Module):
             # self.base_model = mobilenet_v2(False)
 
             self.base_model.last_layer_name = 'classifier'
-            self.input_size = 256
+            assert self._input_size % 32 == 0, \
+                f'mobilenetv2 input_size must be a multiple of 32, got {self._input_size}'
+            self.input_size = self._input_size
             # motion
             # self.input_mean = [0.501, 0.502, 0.502]
             # self.input_std = [0.229, 0.013, 0.031]

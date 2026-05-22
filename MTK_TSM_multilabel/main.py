@@ -44,6 +44,8 @@ def main():
     args.store_name = 'imagenet_mean_std_20240924_resnet50_multilabel_no_freeze_lr_0.01'
     args.store_name = 'look_param'
     args.store_name = 'yen_test'
+    args.store_name = 'yen_test_RGB'
+    args.store_name = 'yen_test_1channel_224'
     # args.store_name = 'test'
     train_data = "/data/ivs01/MTK_TSM_multilabel/mtk_dms_20240924/mtk_dms_data_20240924_label/train_multi.txt"
     if args.pretrain != 'imagenet':
@@ -70,7 +72,8 @@ def main():
                 is_shift=args.shift, shift_div=args.shift_div, shift_place=args.shift_place,
                 fc_lr5=not (args.tune_from and args.dataset in args.tune_from),
                 temporal_pool=args.temporal_pool,
-                non_local=args.non_local)
+                non_local=args.non_local,
+                input_size=args.input_size)
 
     crop_size = model.crop_size
     scale_size = model.scale_size
@@ -84,7 +87,7 @@ def main():
     
         # 計算 GFLOPS 和 Parameters
     in_ch = 1 if args.modality == 'GRAY' else (2 if args.modality == 'Flow' else 3)
-    dummy_input = torch.randn(1, args.num_segments * in_ch, 256, 256).cuda()
+    dummy_input = torch.randn(1, args.num_segments * in_ch, args.input_size, args.input_size).cuda()
     flops = FlopCountAnalysis(model, dummy_input)
     params = parameter_count_table(model)
 

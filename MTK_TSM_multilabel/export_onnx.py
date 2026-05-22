@@ -1,6 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.onnx
+import torch
+import torchvision
+print(f"PyTorch Version: {torch.__version__}")
+print(f"Torchvision Version: {torchvision.__version__}")
 
 from ops.models import TSN
 from opts import parser
@@ -17,8 +21,6 @@ class TSNWrapper(nn.Module):
         # GRAY 模態：1 channel，故 shape 為 (8, 1, 256, 256)，對應輸入 1x8x256x256
         x = x.view(8, 1, 256, 256)
         _, base_out, output = self.model(x, no_reshape=True)
-        # base_out shape: [1, 8, 15]，squeeze(0) 得到 [8, 15]（各 segment 的原始分數）
-        # output shape:   [1, 15]，為 base_out 在 segment 維度做 avg consensus 的結果
         return base_out.view(1, 8, -1)
 
 
